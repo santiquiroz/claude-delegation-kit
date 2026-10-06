@@ -1,0 +1,20 @@
+{
+  "env": {
+    "DELEGATION_LANES": "deepseek > muse > codex > copilot > ollama",
+    "DELEGATION_TARGET": "85"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "TodoWrite",
+        "hooks": [{ "type": "command", "command": "node ~/.claude/hooks/delegation-plan-nudge.mjs" }]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [{ "type": "command", "command": "node ~/.claude/hooks/delegation-agent-nudge.mjs" }]
+      }
+    ]
+  }
+}
