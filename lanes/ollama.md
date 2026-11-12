@@ -10,3 +10,4 @@ Plugin: https://github.com/santiquiroz/ollama-plugin-cc. Billing: none (your GPU
 
 - Text completion only: it never touches files. Review the returned text and apply it yourself; lowest trust tier.
 - Use context-capped model tags (e.g. `-32k` variants). Raw tags default to their native context and spill out of VRAM.
+- If the machine runs `ollama-guard`, Ollama down usually means a game or an editor is open: treat the lane as unavailable and never restart Ollama yourself.

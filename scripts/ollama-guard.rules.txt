@@ -1,0 +1,33 @@
+# ollama-guard rules: while a process matching these runs, Ollama is stopped to free the GPU.
+# A line ending in .exe is a program name. Any other line is a folder: it matches every
+# process whose path contains \<folder>\ on any drive. A leading ! excludes, and wins.
+# Edits apply on the next check (every 5 seconds); no restart needed.
+
+# Game libraries
+steamapps\common
+Epic Games
+XboxGames
+Riot Games
+Ubisoft Game Launcher\games
+GOG Galaxy\Games
+EA Games
+
+# Launchers and tools that live in those folders but are not games
+!Epic Games\Launcher
+!Epic Games\Epic Online Services
+!Riot Games\Riot Client
+!steamapps\common\wallpaper_engine
+!steamapps\common\Steamworks Shared
+!DesktopMate.exe
+!LosslessScaling.exe
+!UnityCrashHandler64.exe
+!UnityCrashHandler32.exe
+!CrashReportClient.exe
+
+# Video, photo and 3D editors
+Resolve.exe
+Adobe Premiere Pro.exe
+AfterFX.exe
+Photoshop.exe
+blender.exe
+CapCut.exe

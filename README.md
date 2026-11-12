@@ -145,10 +145,27 @@ logic with a contract, how to write a task, parallel pattern, quota fallback, lo
 - **bipolar** must run in your interactive session: in session 0 (a service or a password-based scheduled task) the Muse
   and Codex sandboxes cannot start and the broker skips them with `sandbox_requires_interactive_session`.
 
+### Free the GPU for games and editors (Ollama)
+
+[`scripts/ollama-guard.ps1`](scripts/ollama-guard.ps1) stops Ollama while a game or an editing program runs and starts it
+again 20 seconds after it closes, then tells claude-mem to resume its queue. It checks every 5 seconds against
+[`scripts/ollama-guard.rules.txt`](scripts/ollama-guard.rules.txt): store folders (Steam, Epic, Xbox, Riot, Ubisoft, GOG,
+EA), editor executables, and `!` exclusions for helpers that live in those folders but stay open (overlays, animated
+wallpapers). Copy both files somewhere of your own, then:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ollama-guard.ps1 -Check     # what matches right now: must be none
+powershell -ExecutionPolicy Bypass -File ollama-guard.ps1 -Install   # logon task in your session, no admin
+powershell -ExecutionPolicy Bypass -File ollama-guard.ps1 -Uninstall
+```
+
+`-Install` refuses while something matches: an always-on helper in the list would keep Ollama stopped forever.
+[Corral](https://github.com/santiquiroz/corral) is the tray app for pausing by hand and watching VRAM per model.
+
 ### Set up a new PC with one prompt
 
 [`docs/setup-prompt.es.md`](docs/setup-prompt.es.md) (Spanish) is a prompt to paste into Claude Code on a fresh Windows
-PC. It inventories the CLIs, fixes the sandboxes, installs the plugins and bipolar, generates the rules from this kit and
+PC. It inventories the CLIs, fixes the sandboxes, sets up Ollama with claude-mem and the guard, installs the plugins and bipolar, generates the rules from this kit and
 ends with an end-to-end delegation test. Logins, UAC prompts and API keys stay with you.
 
 ### Add a lane of your own
@@ -195,6 +212,9 @@ Do not delegate tasks that process untrusted content (web pages, issues from str
   Muse loads your personal rules unless told not to, which invites recursive delegation.
 - **A killed sandboxed run can leave orphans.** A Muse sandbox worker orphaned by a timeout held a global lock and broke
   every later run until it was killed.
+- **Process-based triggers meet always-on helpers.** The first live run of the Ollama guard matched an Epic overlay, a desktop
+  pet and a Unity crash handler that never close, and would have kept Ollama stopped. Hence `-Check` and an install that
+  refuses while anything matches.
 - **Run the real thing before publishing.** Two of the bugs fixed here passed every hermetic test and only showed up on the
   first real run (a file looked up on disk that lives inside an archive; a credentials format assumed instead of read).
 
