@@ -256,11 +256,20 @@ test_status_hides_keys() {
     WHY='mktemp failed'
     return 1
   }
+  local planted=0
   printf 'UI_API_KEY=sekret123\nOPENROUTER_API_KEY=\n' > "$temp_dir/.env"
+  # a module planted in the current folder must not run inside the probes (they hold keys)
+  # relative path: on Windows, python cannot resolve Git Bash's /tmp paths
+  printf 'open("planted.txt", "w").write("ran")\n' > "$temp_dir/json.py"
   # port 9 (discard) refuses at once; HOME keeps a real ~/.config/bipolar-cc/env out of the run
-  actual=$(HOME="$temp_dir" LITELLM_CONFIG_DIR="$temp_dir" BIPOLAR_URL=http://127.0.0.1:9 OPENROUTER_API_KEY= \
+  actual=$(cd "$temp_dir" && HOME="$temp_dir" LITELLM_CONFIG_DIR="$temp_dir" BIPOLAR_URL=http://127.0.0.1:9 OPENROUTER_API_KEY= \
     bash "$ROOT/scripts/lanes-status.sh" bipolar openrouter 2>&1)
+  [[ -e "$temp_dir/planted.txt" ]] && planted=1
   rm -rf -- "$temp_dir"
+  [[ $planted -eq 0 ]] || {
+    WHY='a json.py in the current folder ran inside the openrouter probe'
+    return 1
+  }
   grep -Eq '^bipolar +DOWN' <<< "$actual" || {
     WHY='bipolar was not reported DOWN on a closed port'
     return 1

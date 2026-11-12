@@ -61,7 +61,7 @@ codex_status() {
 copilot_status() {
   command -v copilot >/dev/null 2>&1 || { row copilot MISSING "copilot not on PATH"; return; }
   command -v gh >/dev/null 2>&1 || { row copilot "?" "gh not installed: no free quota reading"; return; }
-  gh api copilot_internal/user 2>/dev/null | python -c '
+  gh api copilot_internal/user 2>/dev/null | python -I -X utf8 -c '
 import json, sys
 d = json.load(sys.stdin)
 chat = (d.get("quota_snapshots") or {}).get("chat") or {}
@@ -110,7 +110,7 @@ openrouter_status() {
   command -v python >/dev/null 2>&1 || { row openrouter "?" "python not found"; return; }
   local out
   # the key is read inside python so it never lands in argv or in the output
-  out=$(BIPOLAR_ENV_FILE=$(bipolar_env_file) PYTHONIOENCODING=utf-8 python - <<'PY' 2>&1
+  out=$(BIPOLAR_ENV_FILE=$(bipolar_env_file) python -I -X utf8 - <<'PY' 2>&1
 import json, os, re, urllib.request
 try:
     text = open(os.environ["BIPOLAR_ENV_FILE"], encoding="utf-8").read()
