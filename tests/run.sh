@@ -29,7 +29,7 @@ test_default_build() {
     WHY='missing fallback heading'
     return 1
   }
-  contains "$actual" '- mechanical: bipolar → muse → codex → openrouter → ollama → copilot → cursor → antigravity → deepseek → Claude inline' || {
+  contains "$actual" '- mechanical: bipolar → muse → codex → openrouter → junie → ollama → copilot → cursor → antigravity → deepseek → Claude inline' || {
     WHY='mechanical fallback order differs'
     return 1
   }
@@ -37,7 +37,7 @@ test_default_build() {
     WHY='reasoning fallback order differs'
     return 1
   }
-  contains "$actual" '- second-opinion: bipolar → muse → codex → openrouter → copilot → cursor → antigravity → deepseek → Claude inline' || {
+  contains "$actual" '- second-opinion: bipolar → muse → codex → openrouter → junie → copilot → cursor → antigravity → deepseek → Claude inline' || {
     WHY='second-opinion fallback order differs'
     return 1
   }

@@ -19,13 +19,15 @@ Trabaja por fases. Comprueba cada paso con un comando real y no des nada por hec
 
 1. Versiones de Windows, `git`, `node` (necesito 22 o más), `npm`, `python` (3.11 o más), `gh` (opcional) y `claude`. Si falta algo, dime cómo instalarlo (por ejemplo con `winget`) y espera.
    También la GPU: tengo una AMD Radeon RX 7900 XT de 20 GB. Confirma el modelo con `Get-CimInstance Win32_VideoController` (su `AdapterRAM` se corta en 4 GB; la VRAM real la verás en la Fase 3) y la versión del driver de AMD.
-2. Carriles: para cada CLI, la ruta y la versión si está en el PATH: `muse` (Muse Code de Meta), `codex`, `copilot`, `agy` (Antigravity), `cursor-agent` (Cursor), `ollama`, `lms` (LM Studio) y DeepSeek Harness (`%LOCALAPPDATA%\Programs\DeepSeek Harness\DeepSeek Harness.exe`). Si un CLI está instalado pero no en el PATH (busca en `%LOCALAPPDATA%\Programs` y en las carpetas de npm), agrégalo al PATH de **usuario**, no al del sistema.
+2. Carriles: para cada CLI, la ruta y la versión si está en el PATH: `muse` (Muse Code de Meta), `codex`, `copilot`, `agy` (Antigravity), `cursor-agent` (Cursor), `junie` (JetBrains Junie; en Windows deja un acceso `~\.local\bin\junie.bat` y el binario en `~\.local\share\junie\versions\<versión>\junie\junie.exe`), `ollama`, `lms` (LM Studio) y DeepSeek Harness (`%LOCALAPPDATA%\Programs\DeepSeek Harness\DeepSeek Harness.exe`). Si un CLI está instalado pero no en el PATH (busca en `%LOCALAPPDATA%\Programs` y en las carpetas de npm), agrégalo al PATH de **usuario**, no al del sistema.
+   - Si no tengo Junie, pregúntame si lo instalo: su modelo `junie-lite` es gratis con una cuenta de JetBrains. Se instala con `powershell -NoProfile -Command "iex (irm 'https://junie.jetbrains.com/install.ps1')"` (instalador oficial, para mi usuario, sin administrador).
 3. Sesión de cada uno, sin gastar cuota:
    - Muse: `muse sandbox windows check` y si tiene sesión (si no, yo corro `muse login`).
    - Codex: `codex login status` (si no, yo corro `codex login`).
    - Copilot: si la CLI tiene sesión (si no, yo corro `copilot` y dentro escribo `/login`).
    - Antigravity: en Git Bash, `MSYS_NO_PATHCONV=1 agy -p "/usage"` (muestra sus dos pools de cuota semanal sin gastar nada).
    - Cursor: `cursor-agent status` o `cursor-agent about` (si no, yo corro `cursor-agent login`).
+   - Junie: tiene sesión si existe algún `~\.junie\dpapi_credentials\*.dpapi` (no lo abras) o la variable `JUNIE_API_KEY`. Si no, yo corro `junie` en una terminal normal y elijo «Continue with JetBrains account».
 4. DeepSeek: tengo un acceso directo «DeepSeek (LM Studio)». Si lo que hay es **LM Studio** con un modelo DeepSeek, anótalo así: LM Studio no es un carril de delegación. En bipolar sirve como *provider* local (servidor compatible con OpenAI en `http://localhost:1234`). El carril `deepseek` de bipolar necesita la app **DeepSeek Harness** (`dsh`, cobra por uso); si no está, márcalo NO APLICA.
 5. Escribe el inventario en `SETUP-PROGRESO.md`, muéstrame la tabla, dime qué inicios de sesión me faltan y espera a que los haga antes de la Fase 2.
 
@@ -54,6 +56,7 @@ Ollama corre modelos en mi GPU. Con la RX 7900 XT usa ROCm sin instalar nada apa
 1. **Ollama.** Si no está: `winget install Ollama.Ollama`. Queda en `%LOCALAPPDATA%\Programs\Ollama` y arranca con Windows desde la bandeja. Comprueba `GET http://127.0.0.1:11434/api/version`.
    - Variable de usuario `OLLAMA_NUM_PARALLEL=2` (claude-mem procesa dos sesiones a la vez): `[Environment]::SetEnvironmentVariable('OLLAMA_NUM_PARALLEL', '2', 'User')`. Reinicia Ollama para que la tome: cierra «Ollama» en la bandeja y ábrelo de nuevo.
    - En `%LOCALAPPDATA%\Ollama\server.log`, la línea `inference compute` debe mostrar la 7900 XT con `library=ROCm` y unos 20 GB. Si dice CPU, el driver no está al día: dímelo y espera.
+   - **VRAM libre de verdad.** Los programas abiertos también usan VRAM: en un PC de prueba con Edge, Discord, VS Code, Steam, un fondo animado y Phone Link abiertos ya había 9 GB ocupados antes de cargar ningún modelo. Lo que no cabe, Windows lo pasa en silencio a la RAM del sistema por PCIe: `ollama ps` sigue diciendo `100% GPU`, pero el modelo genera de 3 a 10 veces más lento. Con mis programas de siempre abiertos y ningún modelo cargado, mide cuánta VRAM queda: `Get-Counter '\GPU Adapter Memory(*)\Dedicated Usage'` (la instancia con más uso es la 7900 XT; resta ese valor de unos 18,5 GB, porque el driver se reserva algo más de 1 GB de los 20). Anótalo en `SETUP-PROGRESO.md` y dime qué programas usan más VRAM con `Get-Counter '\GPU Process Memory(*)\Dedicated Usage'` (ignora `dwm`, que sale inflado).
 2. **Modelos con contexto acotado.** Nunca uses un tag descargado tal cual: su contexto nativo (100K a 256K tokens) reserva tanta memoria que se sale de la VRAM y todo se vuelve lento. Descarga la base con `ollama pull` y crea una variante con un Modelfile (`ollama create <nombre> -f <archivo>`), por ejemplo:
 
    ```
@@ -66,11 +69,17 @@ Ollama corre modelos en mi GPU. Con la RX 7900 XT usa ROCm sin instalar nada apa
    |---|---|---|---|
    | claude-mem | `qwen3.5:9b` | `qwen3.5-mem` | `num_ctx 32768`, `num_predict 4096`, `temperature 1`, `top_k 20`, `top_p 0.95`, `presence_penalty 1.5`, `num_batch 256` |
    | carril Ollama (delegación de texto) | `devstral:24b` | `ollama-rescue-mechanical` | `num_ctx 32768`, `num_predict 4096` |
-   | chat sin censura | `huihui_ai/qwen3.6-abliterated:27b` | `sin-censura` | `num_ctx 8192`, `num_predict 4096` |
+   | chat sin censura | `huihui_ai/qwen3.6-abliterated:35b-a3b` | `sin-censura` | `num_ctx 8192`, `num_predict 4096`, `num_gpu 99` |
 
-   - Prueba cada uno con `POST /api/generate` (prompt corto, `"stream": false`) y después mira `ollama ps`: la columna PROCESSOR debe decir `100% GPU`. Si reparte entre CPU y GPU, baja ese `num_ctx` a la mitad y crea el modelo otra vez.
-   - En 20 GB cabe un modelo grande a la vez: Ollama descarga uno para cargar otro. Es normal.
-   - El modelo sin censura es una versión *abliterated* (le quitaron las negativas) de Qwen 3.6 27B. Es para chatear desde la ventana de Ollama. No lo uses en claude-mem ni para delegar: sigue peor las instrucciones de formato y ahí no aporta nada. Si el tag ya no existe, busca en ollama.com el `abliterated` más descargado de la familia Qwen que pese menos de 18 GB y pregúntame antes de bajarlo.
+   - Prueba cada uno con `POST /api/generate` (prompt corto, `"stream": false`) y mira la VRAM real, no la columna PROCESSOR de `ollama ps`, que no ve el desborde. Hay dos maneras: el aviso «Desbordando VRAM» de Corral (paso 3), o `Get-Counter '\GPU Process Memory(pid_<pid>_*)\Shared Usage'` del proceso `llama-server` que lanza Ollama (más de ~0,5 GB compartidos = desborde).
+   - `qwen3.5-mem` corre todo el día para claude-mem y **no** debe desbordar. Si desborda, dime qué programas ocupan la VRAM (cerrar el fondo animado o apagar la aceleración por hardware de Discord y del navegador libera varios GB) o baja su `num_ctx` a 16384.
+   - Cuando un modelo no cabe junto a otro, Ollama descarga uno para cargar el otro: al chatear con `sin-censura`, claude-mem espera un rato. Es normal.
+   - El modelo sin censura es una versión *abliterated* (le quitaron las negativas) de Qwen 3.6 35B-A3B, un MoE: tiene 35B parámetros pero usa solo 3B por token. Por eso aguanta bien no caber entero en la VRAM. En un PC de prueba con 16 GB de VRAM, 9 de ellos ocupados por programas, se midió así:
+     - **Este modelo:** 16–17 tok/s, sin negarse a nada, y resolvió bien acertijos y código.
+     - **El 27B denso de la misma familia:** cayó a 2 tok/s, porque cuando no cabe se hunde.
+     - **`num_gpu 99`:** fuerza todas las capas a la GPU aunque una parte se vaya a la RAM, y salió un 25 % más rápido que dejar que Ollama reparta. Necesita unos 24 GB entre VRAM y RAM.
+
+     Es para chatear desde la ventana de Ollama. No lo uses en claude-mem ni para delegar: con el mismo trabajo de claude-mem fue 2 a 3 veces más lento que `qwen3.5-mem`, con calidad parecida. Si el tag ya no existe, busca en ollama.com un `abliterated` de un Qwen MoE (`a3b` en el nombre) que pese menos de 26 GB y pregúntame antes de bajarlo.
 3. **Corral**, una app de bandeja que muestra cuánta VRAM usa cada modelo y pausa o reanuda Ollama con un clic. Busca el asset `*-setup.exe` de la última release con la API pública de GitHub (`https://api.github.com/repos/santiquiroz/corral/releases/latest`), descárgalo a `C:\herramientas\instaladores` y pídeme que lo ejecute (se instala para mi usuario, sin administrador). No está firmado: si sale «Windows protegió su PC», es «Más información» y «Ejecutar de todas formas». Luego, en Corral, Ajustes, que active «Iniciar con Windows (oculto en la bandeja)». Comprueba que quedó la entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 4. **Guardián de juegos y editores.** Corral pausa a mano; para que la GPU se libere sola está el guardián del kit:
    - Clona ya el kit: `git clone https://github.com/santiquiroz/claude-delegation-kit C:\herramientas\claude-delegation-kit` (la Fase 6 lo usa de nuevo).
@@ -92,6 +101,7 @@ Para cada carril instalado, agrega el marketplace e instala el plugin desde Powe
 | Copilot | `claude plugin marketplace add santiquiroz/copilot-plugin-cc` | `claude plugin install copilot@copilot-plugin-cc` |
 | Antigravity | `claude plugin marketplace add santiquiroz/antigravity-plugin-cc` | `claude plugin install antigravity@antigravity-plugin-cc` |
 | Cursor | `claude plugin marketplace add santiquiroz/cursor-plugin-cc` | `claude plugin install cursor@cursor-plugin-cc` |
+| Junie | `claude plugin marketplace add santiquiroz/junie-plugin-cc` | `claude plugin install junie@junie-plugin-cc` |
 | bipolar | `claude plugin marketplace add santiquiroz/bipolar-plugin-cc` | `claude plugin install bipolar@bipolar-plugin-cc` |
 | Ollama | `claude plugin marketplace add santiquiroz/ollama-plugin-cc` | `claude plugin install ollama@ollama-plugin-cc` |
 | claude-mem (memoria entre sesiones) | `claude plugin marketplace add thedotmack/claude-mem` | `claude plugin install claude-mem@thedotmack` |
@@ -101,7 +111,7 @@ Comprueba con `claude plugin list`. Los plugins se cargan al reiniciar Claude Co
 
 ## Fase 5: bipolar-code
 
-1. Clona: `git clone https://github.com/santiquiroz/bipolar-code C:\herramientas\bipolar-code`. Lee su `README.md`, sobre todo «Caso de uso 7», «Caso de uso 8», «Arranque con Windows» y «Seguridad».
+1. Clona: `git clone https://github.com/santiquiroz/bipolar-code C:\herramientas\bipolar-code`. Necesito la versión 2.23.0 o más nueva, que trae el agente `junie` (si ya estaba clonado, `git pull`). Lee su `README.md`, sobre todo «Caso de uso 7», «Caso de uso 8», «Arranque con Windows» y «Seguridad».
 2. Crea el entorno virtual: `powershell -ExecutionPolicy Bypass -File scripts\setup-venv.ps1` (queda en `%LOCALAPPDATA%\bipolar-code\venv`, fuera del repo a propósito: los sandboxes de Muse y Codex marcan el workspace con integridad baja).
 3. Compila la interfaz web: en `frontend`, `npm ci` y `npm run build`. El backend sirve `frontend\dist` en `http://127.0.0.1:8000`.
 4. Arranque al iniciar sesión, sin administrador: `powershell -ExecutionPolicy Bypass -File scripts\install-session-task.ps1`. Esa tarea corre bipolar en mi sesión interactiva, que es donde funcionan los sandboxes de Muse y Codex (en la sesión 0 de una tarea de servicio, bipolar los descarta con `sandbox_requires_interactive_session`).
@@ -115,10 +125,11 @@ Comprueba con `claude plugin list`. Los plugins se cargan al reiniciar Claude Co
    - `delegation.review_default = true`
    - `delegation.thinkers = ["codex", "claude"]` (revisores en solo lectura)
    - `delegation.tier_order`, quitando los agentes que no tenga instalados o con sesión:
-     - `trivial`: `muse, codex, openrouter, ollama, copilot, antigravity, cursor, claude, deepseek`
-     - `simple`: `muse, codex, openrouter, copilot, antigravity, cursor, claude, deepseek`
-     - `standard` y `complex`: `muse, codex, openrouter, claude, antigravity, copilot, deepseek`
+     - `trivial`: `muse, codex, openrouter, ollama, copilot, antigravity, cursor, claude, junie, deepseek`
+     - `simple`: `muse, codex, openrouter, copilot, antigravity, cursor, claude, junie, deepseek`
+     - `standard` y `complex`: `muse, codex, openrouter, claude, antigravity, copilot, junie, deepseek`
    - En `cli_agents`: `muse.max_concurrency = 3`; `claude.model_by_tier = {"trivial": "haiku", "simple": "sonnet", "standard": "sonnet", "complex": "opus"}`; `enabled = false` en los agentes que no tenga (deja `anthropic` apagado: necesita una clave de API de Anthropic con créditos).
+   - **Junie**: si quedó con sesión, `enabled = true` con el modelo que trae (`junie-lite`, gratis). No le pongas otro modelo: la capa gratis solo permite ese y los demás gastan créditos de JetBrains. Ojo: en Windows, Junie sin interfaz aprueba cualquier comando solo y no tiene sandbox. Por eso va de penúltimo, y bipolar solo lo usa dentro de `C:\proyectos`.
    - **OpenRouter** (gratis, 50 requests por día): pídeme que cree una clave en openrouter.ai **con límite de crédito 0** y que la pegue en Settings de bipolar (`OPENROUTER_API_KEY`). Luego, en `cli_agents`, el agente `openrouter`: `enabled = true`, `workspace_allowlist = ["C:\\proyectos"]` (tiene lista propia; vacía, rechaza todo), `default_model` = un modelo `:free` vigente que soporte tools (consulta `https://openrouter.ai/api/v1/models` y filtra los `:free` cuyo `supported_parameters` incluya `tools`) y dos `fallback_models` `:free`.
    - Vuelve a hacer `GET /api/smart/config` y muéstrame una tabla de agentes: instalado, sesión, cuota.
 7. Providers (opcional, para el chat y el proxy, no para delegar): si pegué una clave de NVIDIA NIM en Settings, o si uso LM Studio, comprueba que el provider aparezca en la pestaña Providers.
@@ -140,15 +151,19 @@ Todo sale del kit https://github.com/santiquiroz/claude-delegation-kit, que tamb
 ## Fase 7: reinicio y setup de cada plugin
 
 1. Actualiza `SETUP-PROGRESO.md` y dime que cierre Claude Code, lo abra de nuevo en `C:\proyectos` (`cd C:\proyectos; claude`) y escriba «continúa el setup».
-2. Después del reinicio, corre el setup de cada plugin instalado (están como comandos o skills): `/codex:setup`, `/muse:setup`, `/copilot:setup`, `/antigravity:setup` (escribe la lista de comandos prohibidos en `~/.gemini/antigravity-cli/settings.json`; el plugin se niega a correr sin ella), `/cursor:setup` (crea `~/.cursor-rescue` con su lista de comandos prohibidos y aísla a Cursor de los hooks de `~/.claude`, que en Windows le bloquean todo), `/bipolar:setup`, y `/ollama:setup` o `/deepseek:setup` si aplican.
+2. Después del reinicio, corre el setup de cada plugin instalado (están como comandos o skills): `/codex:setup`, `/muse:setup`, `/copilot:setup`, `/antigravity:setup` (escribe la lista de comandos prohibidos en `~/.gemini/antigravity-cli/settings.json`; el plugin se niega a correr sin ella), `/cursor:setup` (crea `~/.cursor-rescue` con su lista de comandos prohibidos y aísla a Cursor de los hooks de `~/.claude`, que en Windows le bloquean todo), `/junie:setup` (revisa la CLI y la sesión sin mostrar credenciales), `/bipolar:setup`, y `/ollama:setup` o `/deepseek:setup` si aplican.
 3. Comprueba que tienes las herramientas `mcp__bipolar__*` y llama `list_agents`.
-4. **claude-mem con el modelo local.** Lee primero `docs/public/usage/openai-compatible-provider.mdx` del repo de claude-mem (github.com/thedotmack/claude-mem). Luego, en su configuración (`~/.claude-mem/settings.json` o la web del worker en `http://127.0.0.1:37777`), pon:
-   - `CLAUDE_MEM_PROVIDER = openai-compatible`
-   - `CLAUDE_MEM_OPENAI_COMPAT_PRESET = ollama`
-   - `CLAUDE_MEM_OPENAI_COMPAT_BASE_URL = http://127.0.0.1:11434/v1` (con `127.0.0.1`: Ollama solo escucha en IPv4)
-   - `CLAUDE_MEM_OPENAI_COMPAT_MODEL = qwen3.5-mem`
+4. **claude-mem con el modelo local y sin «pensar».** Usa el proveedor `openrouter` de claude-mem apuntado a Ollama, no el `openai-compatible`. El motivo: `qwen3.5-mem` piensa por defecto y gasta miles de tokens en cada observación. Medido: una observación de 8.000 tokens tardaba 141 s, y a veces quedaba vacía porque el pensamiento se comía todo el presupuesto; sin pensar, 23 s. Para apagarlo, Ollama necesita `reasoning_effort: "none"` en la petición. El proveedor `openai-compatible` manda `reasoning: {enabled: false}`, que Ollama ignora, y no tiene dónde agregar campos. El proveedor `openrouter` sí los tiene, con `EXTRA_BODY`. En `~/.claude-mem/settings.json` (respáldalo antes) o en la web del worker (`http://127.0.0.1:37777`), pon:
+   - `CLAUDE_MEM_PROVIDER = openrouter`
+   - `CLAUDE_MEM_OPENROUTER_BASE_URL = http://127.0.0.1:11434/v1` (con `127.0.0.1`: Ollama solo escucha en IPv4)
+   - `CLAUDE_MEM_OPENROUTER_MODEL = qwen3.5-mem`
+   - `CLAUDE_MEM_OPENROUTER_API_KEY = ollama` (Ollama no la mira, pero el proveedor no arranca con la clave vacía)
+   - `CLAUDE_MEM_OPENROUTER_EXTRA_BODY = {"reasoning_effort":"none"}` (es un texto con JSON adentro)
 
-   Si falta el modelo, claude-mem vuelve en silencio a usar Claude y gasta mi plan. Reinicia el worker como diga su documentación. Comprueba en sus logs o en su `/api/health` que el proveedor activo es el local, y con `ollama ps` que `qwen3.5-mem` se carga después de una sesión que use herramientas.
+   Edita `settings.json` cargándolo y guardándolo como JSON (por ejemplo con Python), no con reemplazos de texto: tiene otras claves. El worker relee el archivo en cada llamada (verificado en claude-mem 15.18), así que no hace falta reiniciarlo. Si falta el modelo, claude-mem vuelve en silencio a usar Claude y gasta mi plan. Comprueba tres cosas después de una sesión que use herramientas:
+   - en los logs de claude-mem (`~/.claude-mem/logs/`), que no haya errores del proveedor;
+   - con `ollama ps`, que `qwen3.5-mem` se cargó;
+   - en `%LOCALAPPDATA%\Ollama\server.log`, que las líneas `eval time = … / N tokens` tengan N en los cientos y no en los miles. Si son miles, sigue pensando.
 
 ## Fase 8: prueba de punta a punta
 
