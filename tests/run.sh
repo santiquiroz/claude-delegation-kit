@@ -29,12 +29,16 @@ test_default_build() {
     WHY='missing fallback heading'
     return 1
   }
-  contains "$actual" '- mechanical: deepseek → muse → ollama → copilot → bipolar → cursor → antigravity → Claude inline' || {
+  contains "$actual" '- mechanical: bipolar → muse → codex → openrouter → ollama → copilot → cursor → antigravity → deepseek → Claude inline' || {
     WHY='mechanical fallback order differs'
     return 1
   }
-  contains "$actual" '- reasoning: deepseek → codex → antigravity → Claude inline' || {
+  contains "$actual" '- reasoning: bipolar → muse → codex → openrouter → antigravity → deepseek → Claude inline' || {
     WHY='reasoning fallback order differs'
+    return 1
+  }
+  contains "$actual" '- second-opinion: bipolar → muse → codex → openrouter → copilot → cursor → antigravity → deepseek → Claude inline' || {
+    WHY='second-opinion fallback order differs'
     return 1
   }
 }
@@ -45,7 +49,7 @@ test_selected_lanes() {
     WHY='builder failed for codex copilot'
     return 1
   }
-  contains "$actual" '- mechanical: copilot → Claude inline' || {
+  contains "$actual" '- mechanical: codex → copilot → Claude inline' || {
     WHY='selected mechanical fallback order differs'
     return 1
   }
@@ -53,7 +57,7 @@ test_selected_lanes() {
     WHY='selected reasoning fallback order differs'
     return 1
   }
-  contains "$actual" '- second-opinion: copilot → Claude inline' || {
+  contains "$actual" '- second-opinion: codex → copilot → Claude inline' || {
     WHY='selected second-opinion fallback order differs'
     return 1
   }
@@ -209,15 +213,15 @@ test_plan_nudge() {
     WHY='three-todo plan did not receive the delegate check'
     return 1
   }
-  contains "$actual" '>=85%' || {
+  contains "$actual" '>=90%' || {
     WHY='default delegation target was not included'
     return 1
   }
-  actual=$(printf '%s' "$todos" | DELEGATION_TARGET=90 node "$ROOT/hooks/delegation-plan-nudge.mjs") || {
+  actual=$(printf '%s' "$todos" | DELEGATION_TARGET=95 node "$ROOT/hooks/delegation-plan-nudge.mjs") || {
     WHY='plan nudge failed with a custom target'
     return 1
   }
-  contains "$actual" '>=90%' || {
+  contains "$actual" '>=95%' || {
     WHY='custom delegation target was not included'
     return 1
   }
@@ -228,6 +232,45 @@ test_plan_nudge() {
     }
   [[ -z "$actual" ]] || {
     WHY='two-todo plan unexpectedly received a nudge'
+    return 1
+  }
+}
+
+test_status_probes_exist() {
+  local script="$ROOT/scripts/lanes-status.sh" name
+  for name in bipolar_env_file bipolar_status openrouter_status; do
+    grep -q "^$name() {" "$script" || {
+      WHY="lanes-status.sh does not define $name"
+      return 1
+    }
+  done
+  grep -Fq -- '-H @-' "$script" || {
+    WHY='bipolar key is not sent through stdin'
+    return 1
+  }
+}
+
+test_status_hides_keys() {
+  local temp_dir actual
+  temp_dir=$(mktemp -d) || {
+    WHY='mktemp failed'
+    return 1
+  }
+  printf 'UI_API_KEY=sekret123\nOPENROUTER_API_KEY=\n' > "$temp_dir/.env"
+  # port 9 (discard) refuses at once; HOME keeps a real ~/.config/bipolar-cc/env out of the run
+  actual=$(HOME="$temp_dir" LITELLM_CONFIG_DIR="$temp_dir" BIPOLAR_URL=http://127.0.0.1:9 OPENROUTER_API_KEY= \
+    bash "$ROOT/scripts/lanes-status.sh" bipolar openrouter 2>&1)
+  rm -rf -- "$temp_dir"
+  grep -Eq '^bipolar +DOWN' <<< "$actual" || {
+    WHY='bipolar was not reported DOWN on a closed port'
+    return 1
+  }
+  grep -Eq '^openrouter +(NO-AUTH|\?)' <<< "$actual" || {
+    WHY='openrouter without a key was not reported NO-AUTH'
+    return 1
+  }
+  ! contains "$actual" 'sekret123' || {
+    WHY='the bipolar key leaked into the output'
     return 1
   }
 }
@@ -254,6 +297,8 @@ run_test 'shell script syntax' test_script_syntax
 run_test 'hook and settings syntax' test_hook_and_json_syntax
 run_test 'agent nudge behavior' test_agent_nudge
 run_test 'plan nudge behavior' test_plan_nudge
+run_test 'status probes exist' test_status_probes_exist
+run_test 'status script hides keys' test_status_hides_keys
 
 printf '%s/%s tests passed\n' "$PASSED" "$TOTAL"
 [[ $PASSED -eq $TOTAL ]]

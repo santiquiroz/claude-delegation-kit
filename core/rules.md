@@ -9,8 +9,10 @@ reviews the diff when it comes back, and commits. The lanes, their order and the
 Lanes run out (monthly allowances, weekly pools, prepaid balances), and finding out by delegating costs minutes: some CLIs
 hang silently or retry for many minutes on an empty pool.
 
-- On the FIRST delegation of a session, and after any quota error, run `bash scripts/lanes-status.sh` (free probes only)
-  and skip every lane reported `EXHAUSTED`, `MISSING`, `NO-AUTH`, `DOWN` or `BROKEN`.
+- On the FIRST delegation of a session, and after any quota error, run `bash ~/.claude/scripts/lanes-status.sh` (free
+  probes only) and skip every lane reported `EXHAUSTED`, `MISSING`, `NO-AUTH`, `DOWN` or `BROKEN`.
+- `OK` is not a quota guarantee: lanes without a free meter (Muse, Copilot, Cursor, DeepSeek) can answer 429 on the first
+  real run. At the first quota error, move to the next lane instead of waiting.
 - Never record quota percentages in this file: they go stale. The script is the source of truth.
 
 ## Default-delegate rule (mandatory)
@@ -21,7 +23,7 @@ hang silently or retry for many minutes on an empty pool.
 - Everything else is delegated in the background from the start, following the lane order of the matching row in
   "Fallback order".
 - Read-only work is delegated too: exploring code, contrasting a diagnosis, reviewing a diff (use a lane's read-only mode).
-- Session target: **≥85% of subtasks executed by lanes**. A task finished 100% inline is a process failure; say so in the
+- Session target: **≥90% of subtasks executed by lanes**. A task finished 100% inline is a process failure; say so in the
   session summary.
 - This applies inside agentic flows too: before spawning a Claude subagent to IMPLEMENT something, check whether one of the
   lane subagents should take it instead. "I already delegated it to a Claude subagent" does not count.
@@ -29,10 +31,22 @@ hang silently or retry for many minutes on an empty pool.
 
 ## Never delegate
 
-- Domain logic, business rules, entity state machines.
 - Architecture decisions or feature design.
-- Complex refactors that need the whole codebase in mind.
-- Anything where the WHY lives in the current conversation.
+- Writing the contract of each subtask: the WHY stays with Claude, the delegate gets the WHAT.
+- Complex refactors that need the whole codebase in mind and cannot be written down as a contract.
+- A diagnosis that is the task itself.
+
+## Domain logic: delegated with a contract
+
+Business rules, state machines and data migrations are delegated too, but only with an exact contract:
+
+- Claude designs the rule and writes the files, the signatures, the rule in precise words, the edge cases with their
+  inputs and expected outputs, and the tests that must pass. For a migration: the data before and after, and the query
+  that checks it.
+- A lane implements it (with the tests in bipolar's `verify` when available, so failures go back to the delegate).
+- Claude reviews the diff line by line against the contract and runs the full suites (migrations on a throwaway
+  database). If it does not match, it goes back to the same lane with the findings; after 2 failed rounds, Claude
+  finishes it inline and says so.
 
 ## How to write a delegated task
 
@@ -40,12 +54,14 @@ hang silently or retry for many minutes on an empty pool.
   conversation.
 - Tell it not to commit, push, reset, checkout, clean or delete; the orchestrator verifies and commits.
 - Ask for the list of touched files at the end.
-- Treat every result as medium trust: read `git status`, `git diff`, `git log` and `git stash list` before committing.
+- Treat every result as medium trust: read `git status`, `git diff --stat`, `git diff`, `git log` and `git stash list`
+  before committing. A lane that runs out of quota mid-run can leave files EMPTY and still report it finished:
+  look for mass deletions in `--stat` and restore them with `git checkout HEAD -- <file>`.
 
 ## Parallel pattern
 
 ```
-Claude: writes the domain piece itself
+Claude: writes the contract of each piece
   → launches lane A in the background: "fix the build errors in module X"
   → launches lane B in the background: "write tests for X (signatures below)"
 Claude: continues with the next subtask while both run, then reviews both diffs

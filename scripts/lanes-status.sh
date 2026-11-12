@@ -81,12 +81,56 @@ ollama_status() {
   else row ollama DOWN "no answer on :11434"; fi
 }
 
+bipolar_env_file() {
+  if [ -n "${LITELLM_CONFIG_DIR:-}" ]; then printf '%s/.env' "$LITELLM_CONFIG_DIR"
+  elif [ -d C:/litellm ]; then printf 'C:/litellm/.env'
+  else printf '%s/.litellm/.env' "$HOME"; fi
+}
+
+env_value() {
+  sed -n "s/^$1=//p" "$2" 2>/dev/null | head -1 | tr -d '\r'
+}
+
 bipolar_status() {
   [ -f "$HOME/.config/bipolar-cc/env" ] && . "$HOME/.config/bipolar-cc/env"
-  [ -n "${BIPOLAR_URL:-}" ] || { row bipolar UNSET "no ~/.config/bipolar-cc/env (run /bipolar:setup)"; return; }
-  local health
-  health=$(curl -s -m 5 -H "x-api-key: ${BIPOLAR_API_KEY:-}" "$BIPOLAR_URL/api/health")
-  [ -n "$health" ] && row bipolar OK "$(printf '%s' "$health" | cut -c1-90)" || row bipolar DOWN "$BIPOLAR_URL does not answer"
+  local url=${BIPOLAR_URL:-http://127.0.0.1:8000} env key health
+  env=$(bipolar_env_file)
+  key=${BIPOLAR_API_KEY:-$(env_value UI_API_KEY "$env")}
+  [ -n "$key" ] || { row bipolar NO-AUTH "no BIPOLAR_API_KEY and no UI_API_KEY in $env"; return; }
+  # header through stdin so the key never shows up in the process list
+  health=$(printf 'x-api-key: %s\n' "$key" | curl -s -m 5 -H @- "$url/api/health")
+  if [ -n "$health" ]; then
+    row bipolar OK "$url: $(printf '%s' "$health" | tr -d '\r\n' | cut -c1-80); delegate through the bipolar MCP"
+  else
+    row bipolar DOWN "$url does not answer — start bipolar (Windows: Start-ScheduledTask 'bipolar-code backend sesion')"
+  fi
+}
+
+openrouter_status() {
+  command -v python >/dev/null 2>&1 || { row openrouter "?" "python not found"; return; }
+  local out
+  # the key is read inside python so it never lands in argv or in the output
+  out=$(BIPOLAR_ENV_FILE=$(bipolar_env_file) PYTHONIOENCODING=utf-8 python - <<'PY' 2>&1
+import json, os, re, urllib.request
+try:
+    text = open(os.environ["BIPOLAR_ENV_FILE"], encoding="utf-8").read()
+except OSError:
+    text = ""
+m = re.search(r"^OPENROUTER_API_KEY=(\S+)", text, re.M)
+key = os.environ.get("OPENROUTER_API_KEY") or (m.group(1) if m else "")
+if not key:
+    print("NO-AUTH|no OPENROUTER_API_KEY in bipolar's .env"); raise SystemExit
+req = urllib.request.Request("https://openrouter.ai/api/v1/key", headers={"Authorization": "Bearer " + key})
+try:
+    d = json.load(urllib.request.urlopen(req, timeout=10)).get("data") or {}
+except Exception as e:
+    print("?|" + e.__class__.__name__ + ": " + str(e)[:80]); raise SystemExit
+warn = "" if d.get("limit") == 0 else " — key with credit: use a dedicated one with a 0 limit"
+quota = "50/day (no purchases)" if d.get("is_free_tier") else "1000/day"
+print("OK|only through bipolar (agent=openrouter), :free models, " + quota + "; no headless daily counter" + warn)
+PY
+)
+  row openrouter "${out%%|*}" "${out#*|}"
 }
 
 antigravity_status() {

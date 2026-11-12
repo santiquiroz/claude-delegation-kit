@@ -1,7 +1,7 @@
 {
   "env": {
-    "DELEGATION_LANES": "deepseek > muse > codex > copilot > ollama",
-    "DELEGATION_TARGET": "85"
+    "DELEGATION_LANES": "muse > codex > openrouter > copilot > antigravity > cursor",
+    "DELEGATION_TARGET": "90"
   },
   "hooks": {
     "PostToolUse": [

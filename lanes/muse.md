@@ -1,20 +1,28 @@
-<!-- roles: mechanical second-opinion -->
+<!-- roles: mechanical reasoning second-opinion -->
 ## Muse (Meta) — `muse:muse-rescue`
 
-Agentic headless lane on Meta's coding agent (`muse exec`). Plugin: https://github.com/santiquiroz/muse-plugin-cc
-(`/muse:rescue`, `/muse:setup`). Billing: Muse subscription.
+First lane: agentic headless runs of Meta's coding agent (`muse exec`). Plugin: https://github.com/santiquiroz/muse-plugin-cc
+(`/muse:rescue`, `/muse:setup`). Billing: Muse Code subscription (short window plus a weekly limit, no headless meter).
 
 | Trigger | Action |
 |---|---|
-| Bounded task (a spec, a rename, boilerplate, one fix) when the lane before it is busy or out of balance | `muse:muse-rescue` in the background |
-| Read-only second opinion or investigation in parallel to another lane | `muse:muse-rescue --read-only` (no writes, no shell) |
+| Bounded task (a spec, a rename, boilerplate, config, one fix, a PR description) | `muse:muse-rescue` in the background, first |
+| Reasoning task (build broken after one attempt, multi-file refactor, root cause) | `muse:muse-rescue` in the background; if it comes back unusable or incomplete, next lane |
+| Read-only second opinion or investigation | `muse:muse-rescue --read-only` (no writes, no shell; paste the code or the diff) |
+| Several independent subtasks | Up to 3-4 Muse jobs at once on different files |
 | `Muse quota or rate limit hit`, login error | Do not retry; next lane of the row (`muse login` for auth) |
 
-- Slow headless (a trivial task takes 25 s to 4 minutes). Runs are detached and awaited in slices of up to 9 minutes
-  (`start` + `wait`), so a run can last up to `MUSE_RESCUE_MAX_SECONDS` (45 minutes by default).
-- Runs under Muse's own sandbox (writes confined to the workspace, shell without direct internet), `--approval-mode never`
-  (nothing is ever auto-approved; a request to run unsandboxed is refused) and `--no-foreign-personal-context` (without it
-  Muse loads your `~/.claude` rules, including these, and may delegate recursively).
-- Windows: `muse sandbox windows check` must say `status=ready`. A workspace inside a folder private to your user (e.g. under
-  `%USERPROFILE%\AppData`) makes the sandboxed shell hang with no error. A killed run can leave an orphan sandbox worker that
-  holds a global lock and breaks the next runs: the plugin cleans it up.
+- Slow headless: 25 s to 15 minutes per task. Runs are detached and awaited in slices of up to 9 minutes (`start` +
+  `wait`), up to `MUSE_RESCUE_MAX_SECONDS` (45 minutes by default). Slowness is no reason to skip it: keep working meanwhile.
+- Another directory (another repo, a git worktree): pass `-C <dir>` before the task, or Muse runs in the session folder and
+  its sandbox denies writes to the other one.
+- Runs under Muse's own sandbox (writes confined to the workspace, network only through its proxy), `--approval-mode never`
+  and `--no-foreign-personal-context` (without it Muse loads your `~/.claude` rules and delegates recursively).
+- Its sandbox cannot run anything that opens local sockets (`dotnet test`, `ng test`, `npx`): tell it "do not run the
+  tests" and run them yourself or through bipolar's `verify`. A `dotnet restore` without network can also break `obj/`.
+- When its quota runs out mid-run it can leave files empty and still report it finished: check `git diff --stat`.
+- Two jobs can deadlock on the sandbox's global ACL lock ("ACL publication lock … timed out"): cancel one, rerun in series.
+- Windows: `muse sandbox windows check` must say `status=ready` (else `muse sandbox windows setup`, elevated). Give the
+  `MuseSandboxUsers` group write access to your Temp folder once, or builds fail with `UnauthorizedAccessException`:
+  `icacls "$env:LOCALAPPDATA\Temp" /grant "MuseSandboxUsers:(OI)(CI)M"`. A workspace under `%USERPROFILE%\AppData`
+  makes the sandboxed shell hang with no error.
