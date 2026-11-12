@@ -22,7 +22,7 @@ flowchart LR
     CC -.->|"subagentes de los plugins<br/>si bipolar está caído"| L
     BP -->|"elige por tier y cuota"| L
     subgraph L["carriles, en orden"]
-        MU["Muse · suscripción"] --- CX["Codex · plan de ChatGPT"] --- OR["OpenRouter · :free"] --- OL["Ollama · GPU local"]
+        MU["Muse · suscripción"] --- CX["Codex · plan de ChatGPT"] --- OR["OpenRouter · :free"] --- JU["Junie · junie-lite gratis"] --- OL["Ollama · GPU local"]
         CP["Copilot · mensual"] --- CU["Cursor · plan"] --- AG["Antigravity · pools semanales"] --- DS["DeepSeek · prepago, último"]
     end
     L -->|"ediciones en el árbol de trabajo"| REV["bipolar corre verify + revisión<br/>Claude lee el git diff y hace commit"]
@@ -37,9 +37,9 @@ flowchart TD
     Q1 -->|no| Q2{"¿≤3 líneas en un archivo?"}
     Q2 -->|sí| IN
     Q2 -->|no| Q3{"Tipo de trabajo"}
-    Q3 -->|mecánico| M0["bipolar MCP"] -.->|"caído o sin cuota"| M1["Muse"] -.-> M2["Codex"] -.-> M3["OpenRouter"] -.-> M4["Ollama"] -.-> M5["Copilot"] -.-> M6["Cursor"] -.-> M7["Antigravity Flash"] -.-> M8["DeepSeek flash"] -.-> IN
+    Q3 -->|mecánico| M0["bipolar MCP"] -.->|"caído o sin cuota"| M1["Muse"] -.-> M2["Codex"] -.-> M3["OpenRouter"] -.-> M3b["Junie"] -.-> M4["Ollama"] -.-> M5["Copilot"] -.-> M6["Cursor"] -.-> M7["Antigravity Flash"] -.-> M8["DeepSeek flash"] -.-> IN
     Q3 -->|razonamiento| R0["bipolar MCP"] -.->|"caído o sin cuota"| R1["Muse"] -.-> R2["Codex"] -.-> R3["OpenRouter"] -.-> R4["Antigravity frontier"] -.-> R5["DeepSeek v4-pro"] -.-> IN
-    Q3 -->|segunda opinión| S1["Muse solo lectura"] -.-> S2["Codex solo lectura"] -.-> S3["OpenRouter"] -.-> S4["Copilot solo lectura"] -.-> S5["Cursor modo ask"] -.-> S6["Antigravity solo lectura"] -.-> S7["DeepSeek solo lectura"]
+    Q3 -->|segunda opinión| S1["Muse solo lectura"] -.-> S2["Codex solo lectura"] -.-> S3["OpenRouter"] -.-> S3b["Junie solo lectura"] -.-> S4["Copilot solo lectura"] -.-> S5["Cursor modo ask"] -.-> S6["Antigravity solo lectura"] -.-> S7["DeepSeek solo lectura"]
 ```
 
 La lógica de dominio también va a un carril, con un contrato escrito (archivos, firmas, casos borde con entradas y
@@ -77,6 +77,7 @@ sequenceDiagram
 | muse | Meta Muse `muse exec` | [muse-plugin-cc](https://github.com/santiquiroz/muse-plugin-cc) | suscripción | primer carril: tareas acotadas, razonamiento, revisiones de solo lectura (lento) | sandbox del SO de Muse, shell sin internet directo, nada autoaprobado |
 | codex | OpenAI Codex CLI | [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) | créditos del plan de ChatGPT | segundo carril para todo tipo de tarea: builds rotos, razonamiento multiarchivo, causa raíz, trabajo mecánico | sandbox `workspace-write`, no puede escribir en `.git` |
 | openrouter | Claude Code con modelos `:free` de OpenRouter | solo por bipolar (`agent="openrouter"`) | cupo diario gratis | tareas acotadas y mecánicas cuando Muse y Codex no tienen cuota | solo modelos `:free`, allow-list propia, nada de secretos en las tareas |
+| junie | JetBrains Junie CLI | [junie-plugin-cc](https://github.com/santiquiroz/junie-plugin-cc) | `junie-lite` gratis; otros modelos gastan créditos de JetBrains | tareas acotadas, revisiones de solo lectura en un worktree desechable | ninguna en Windows: autoaprueba cada comando, revisar el diff |
 | ollama | modelo Ollama local | [ollama-plugin-cc](https://github.com/santiquiroz/ollama-plugin-cc) | gratis | texto mecánico más barato | solo texto, nunca toca archivos |
 | copilot | GitHub Copilot CLI | [copilot-plugin-cc](https://github.com/santiquiroz/copilot-plugin-cc) | asignación mensual | especificaciones, renombres, boilerplate, descripciones de PR | flags de herramientas allow/deny con alcance |
 | cursor | Cursor Agent CLI | [cursor-plugin-cc](https://github.com/santiquiroz/cursor-plugin-cc) | plan de Cursor | tareas acotadas, revisiones en modo ask | reglas deny propias del plugin |
@@ -211,6 +212,7 @@ No delegues tareas que procesen contenido no confiable (páginas web, issues de 
 - **La sesión 0 de Windows rompe los sandboxes.** Un broker arrancado como servicio no puede correr Muse ni Codex.
 - **Los agentes importan tu configuración de Claude Code.** Cursor importa los hooks de `~/.claude` (que pueden bloquear cada llamada a herramientas en Windows) y
   Muse carga tus reglas personales a menos que se le diga lo contrario, lo que invita a la delegación recursiva.
+- **Junie en Windows no tiene sandbox** y autoaprueba cada comando: úsalo solo en repos propios y revisa el diff.
 - **Una ejecución con sandbox eliminada puede dejar huérfanos.** Un worker del sandbox de Muse huérfano por un timeout retuvo un lock global y rompió
   cada ejecución posterior hasta que se eliminó.
 - **Los disparadores por proceso chocan con programas que nunca se cierran.** La primera ejecución real del guardián de Ollama

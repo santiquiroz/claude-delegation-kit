@@ -162,6 +162,24 @@ cursor_status() {
   esac
 }
 
+junie_status() {
+  local data v bin ver
+  data="${JUNIE_DATA_DIR:-$HOME/.local/share/junie}"
+  v=$(head -1 "$data/current" 2>/dev/null | tr -d '\r\n')
+  bin="$data/versions/$v/junie/junie.exe"
+  [ -f "$bin" ] || bin="$data/versions/$v/junie/junie"
+  if [ -z "$v" ] || [ ! -f "$bin" ]; then
+    command -v junie >/dev/null 2>&1 || { row junie MISSING "Junie CLI not installed"; return; }
+    bin=$(command -v junie)
+  fi
+  ver=$("$bin" --version </dev/null 2>/dev/null | tr -d '\r' | sed -n 's/^Junie version: //p')
+  if [ -n "${JUNIE_API_KEY:-}" ] || ls "${JUNIE_HOME:-$HOME/.junie}"/dpapi_credentials/*.dpapi >/dev/null 2>&1; then
+    row junie OK "$ver; junie-lite is free, other models spend JetBrains credits; no free headless meter; no sandbox on Windows"
+  else
+    row junie NO-AUTH "$ver: run 'junie' once in a terminal and sign in, or export JUNIE_API_KEY"
+  fi
+}
+
 conf_lanes() {
   grep -Ev '^[[:space:]]*(#|$)' "$ROOT/lanes.conf" | tr -d '\r' | sed 's/[[:space:]]*$//'
 }

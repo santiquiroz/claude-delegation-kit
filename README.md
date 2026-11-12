@@ -22,7 +22,7 @@ flowchart LR
     CC -.->|"plugin subagents<br/>when bipolar is down"| L
     BP -->|"picks by tier and quota"| L
     subgraph L["lanes, in order"]
-        MU["Muse · subscription"] --- CX["Codex · ChatGPT plan"] --- OR["OpenRouter · :free"] --- OL["Ollama · local GPU"]
+        MU["Muse · subscription"] --- CX["Codex · ChatGPT plan"] --- OR["OpenRouter · :free"] --- JU["Junie · junie-lite free"] --- OL["Ollama · local GPU"]
         CP["Copilot · monthly"] --- CU["Cursor · plan"] --- AG["Antigravity · weekly pools"] --- DS["DeepSeek · prepaid, last"]
     end
     L -->|"edits in the working tree"| REV["bipolar runs verify + review<br/>Claude reads git diff, commits"]
@@ -37,9 +37,9 @@ flowchart TD
     Q1 -->|no| Q2{"≤3 lines in one file?"}
     Q2 -->|yes| IN
     Q2 -->|no| Q3{"Kind of work"}
-    Q3 -->|mechanical| M0["bipolar MCP"] -.->|"down or out"| M1["Muse"] -.-> M2["Codex"] -.-> M3["OpenRouter"] -.-> M4["Ollama"] -.-> M5["Copilot"] -.-> M6["Cursor"] -.-> M7["Antigravity Flash"] -.-> M8["DeepSeek flash"] -.-> IN
+    Q3 -->|mechanical| M0["bipolar MCP"] -.->|"down or out"| M1["Muse"] -.-> M2["Codex"] -.-> M3["OpenRouter"] -.-> M3b["Junie"] -.-> M4["Ollama"] -.-> M5["Copilot"] -.-> M6["Cursor"] -.-> M7["Antigravity Flash"] -.-> M8["DeepSeek flash"] -.-> IN
     Q3 -->|reasoning| R0["bipolar MCP"] -.->|"down or out"| R1["Muse"] -.-> R2["Codex"] -.-> R3["OpenRouter"] -.-> R4["Antigravity frontier"] -.-> R5["DeepSeek v4-pro"] -.-> IN
-    Q3 -->|second opinion| S1["Muse read-only"] -.-> S2["Codex read-only"] -.-> S3["OpenRouter"] -.-> S4["Copilot read-only"] -.-> S5["Cursor ask mode"] -.-> S6["Antigravity read-only"] -.-> S7["DeepSeek read-only"]
+    Q3 -->|second opinion| S1["Muse read-only"] -.-> S2["Codex read-only"] -.-> S3["OpenRouter"] -.-> S3b["Junie read-only"] -.-> S4["Copilot read-only"] -.-> S5["Cursor ask mode"] -.-> S6["Antigravity read-only"] -.-> S7["DeepSeek read-only"]
 ```
 
 Domain logic goes to a lane too, with a written contract (files, signatures, edge cases with inputs and outputs, tests
@@ -77,6 +77,7 @@ sequenceDiagram
 | muse | Meta Muse `muse exec` | [muse-plugin-cc](https://github.com/santiquiroz/muse-plugin-cc) | subscription | first lane: bounded tasks, reasoning, read-only reviews (slow) | Muse OS sandbox, shell without direct internet, nothing auto-approved |
 | codex | OpenAI Codex CLI | [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) | ChatGPT plan credits | second lane for every kind of task: build fixes, multi-file reasoning, root cause, mechanical work | `workspace-write` sandbox, cannot write `.git` |
 | openrouter | Claude Code on OpenRouter `:free` models | through bipolar only (`agent="openrouter"`) | free daily allowance | bounded and mechanical tasks when Muse and Codex are out | `:free` models only, own workspace allow-list, no secrets in tasks |
+| junie | JetBrains Junie CLI | [junie-plugin-cc](https://github.com/santiquiroz/junie-plugin-cc) | free `junie-lite`; other models spend JetBrains credits | bounded tasks, read-only reviews in a disposable worktree | none on Windows: auto-approves every command, review the diff |
 | ollama | local Ollama model | [ollama-plugin-cc](https://github.com/santiquiroz/ollama-plugin-cc) | free | cheapest mechanical text | text only, never touches files |
 | copilot | GitHub Copilot CLI | [copilot-plugin-cc](https://github.com/santiquiroz/copilot-plugin-cc) | monthly allowance | specs, renames, boilerplate, PR descriptions | scoped allow/deny tool flags |
 | cursor | Cursor Agent CLI | [cursor-plugin-cc](https://github.com/santiquiroz/cursor-plugin-cc) | Cursor plan | bounded tasks, ask-mode reviews | plugin-owned deny rules |
@@ -210,6 +211,7 @@ Do not delegate tasks that process untrusted content (web pages, issues from str
 - **Windows session 0 breaks the sandboxes.** A broker started as a service cannot run Muse or Codex.
 - **Agents import your Claude Code setup.** Cursor imports `~/.claude` hooks (which can block every tool call on Windows) and
   Muse loads your personal rules unless told not to, which invites recursive delegation.
+- **Junie on Windows has no sandbox** and auto-approves every command: keep it to repos you own and review the diff.
 - **A killed sandboxed run can leave orphans.** A Muse sandbox worker orphaned by a timeout held a global lock and broke
   every later run until it was killed.
 - **Process-based triggers meet always-on helpers.** The first live run of the Ollama guard matched an Epic overlay, a desktop
