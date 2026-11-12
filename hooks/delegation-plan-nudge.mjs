@@ -1,8 +1,8 @@
 // PostToolUse(TodoWrite): when a long plan moves a task to in_progress, remind Claude to pick a lane before
 // implementing it inline. Configure with DELEGATION_LANES and DELEGATION_TARGET (see hooks/README in the repo).
 const MIN_TODOS_FOR_NUDGE = 3
-const LANES = process.env.DELEGATION_LANES || 'deepseek > muse > codex > copilot > ollama'
-const TARGET = process.env.DELEGATION_TARGET || '85'
+const LANES = process.env.DELEGATION_LANES || 'muse > codex > openrouter > copilot > ollama'
+const TARGET = process.env.DELEGATION_TARGET || '90'
 
 function nudgeFor(todos) {
   if (todos.length < MIN_TODOS_FOR_NUDGE) return ''
