@@ -284,6 +284,17 @@ test_status_hides_keys() {
   }
 }
 
+test_ollama_guard_selftest() {
+  command -v pwsh >/dev/null || {
+    WHY='pwsh not found (needed to test scripts/ollama-guard.ps1)'
+    return 1
+  }
+  pwsh -NoProfile -File "$ROOT/scripts/ollama-guard.ps1" -SelfTest || {
+    WHY='ollama-guard self-test failed'
+    return 1
+  }
+}
+
 run_test() {
   local name=$1
   shift
@@ -308,6 +319,7 @@ run_test 'agent nudge behavior' test_agent_nudge
 run_test 'plan nudge behavior' test_plan_nudge
 run_test 'status probes exist' test_status_probes_exist
 run_test 'status script hides keys' test_status_hides_keys
+run_test 'ollama guard self-test' test_ollama_guard_selftest
 
 printf '%s/%s tests passed\n' "$PASSED" "$TOTAL"
 [[ $PASSED -eq $TOTAL ]]

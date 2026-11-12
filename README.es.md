@@ -145,10 +145,27 @@ cuota, tareas largas) viven en [`core/rules.md`](core/rules.md).
 - **bipolar** debe correr en tu sesión interactiva: en la sesión 0 (un servicio o una tarea programada con contraseña) los
   sandboxes de Muse y Codex no arrancan y el broker los descarta con `sandbox_requires_interactive_session`.
 
+### Libera la GPU para juegos y editores (Ollama)
+
+[`scripts/ollama-guard.ps1`](scripts/ollama-guard.ps1) detiene Ollama mientras corre un juego o un programa de edición y lo
+vuelve a abrir 20 segundos después de cerrarlo; luego le avisa a claude-mem que retome su cola. Revisa cada 5 segundos contra
+[`scripts/ollama-guard.rules.txt`](scripts/ollama-guard.rules.txt): carpetas de tiendas (Steam, Epic, Xbox, Riot, Ubisoft,
+GOG, EA), ejecutables de editores y exclusiones con `!` para programas que viven en esas carpetas pero quedan abiertos
+(overlays, fondos animados). Copia los dos archivos a una carpeta tuya y luego:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ollama-guard.ps1 -Check     # qué coincide ahora: debe ser none
+powershell -ExecutionPolicy Bypass -File ollama-guard.ps1 -Install   # tarea al iniciar sesión, sin administrador
+powershell -ExecutionPolicy Bypass -File ollama-guard.ps1 -Uninstall
+```
+
+`-Install` se niega mientras algo coincida: un programa que queda siempre abierto en la lista dejaría Ollama parado para
+siempre. [Corral](https://github.com/santiquiroz/corral) es la app de bandeja para pausar a mano y ver la VRAM de cada modelo.
+
 ### Configura un PC nuevo con un solo prompt
 
 [`docs/setup-prompt.es.md`](docs/setup-prompt.es.md) es un prompt para pegar en Claude Code en un PC con Windows recién
-instalado. Hace el inventario de los CLI, arregla los sandboxes, instala los plugins y bipolar, genera las reglas con este
+instalado. Hace el inventario de los CLI, arregla los sandboxes, monta Ollama con claude-mem y el guardián, instala los plugins y bipolar, genera las reglas con este
 kit y termina con una prueba de delegación de punta a punta. Los inicios de sesión, las ventanas de administrador y las
 claves de API quedan en tus manos.
 
@@ -196,6 +213,9 @@ No delegues tareas que procesen contenido no confiable (páginas web, issues de 
   Muse carga tus reglas personales a menos que se le diga lo contrario, lo que invita a la delegación recursiva.
 - **Una ejecución con sandbox eliminada puede dejar huérfanos.** Un worker del sandbox de Muse huérfano por un timeout retuvo un lock global y rompió
   cada ejecución posterior hasta que se eliminó.
+- **Los disparadores por proceso chocan con programas que nunca se cierran.** La primera ejecución real del guardián de Ollama
+  encontró un overlay de Epic, una mascota de escritorio y un crash handler de Unity siempre abiertos, que lo habrían dejado
+  parado. Por eso existen `-Check` y un instalador que se niega mientras algo coincida.
 - **Ejecuta lo real antes de publicar.** Dos de los bugs corregidos aquí pasaron todas las pruebas herméticas y solo aparecieron en la primera ejecución real
   (un archivo buscado en disco que vive dentro de un archivo comprimido; un formato de credenciales asumido en lugar de leído).
 
